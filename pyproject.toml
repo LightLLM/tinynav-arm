@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tinynav-arm"
+version = "0.1.0"
+description = "Arm64-oriented Physical AI perception and robot control reference pipeline"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = ["fastapi>=0.115,<1", "uvicorn[standard]>=0.30,<1", "numpy>=1.26,<3"]
+
+[project.optional-dependencies]
+onnx = ["onnx>=1.16,<2", "onnxruntime>=1.19,<2", "opencv-python-headless>=4.10,<5"]
+dev = ["httpx>=0.27,<1", "pytest>=8,<9", "ruff>=0.8,<1"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110

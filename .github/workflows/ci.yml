@@ -1,0 +1,19 @@
+name: Arm64 CI
+on:
+  push:
+  pull_request:
+jobs:
+  python-tests:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e '.[dev]'
+      - run: pytest -q
+      - run: python tools/benchmark.py --iterations 30 --output results/ci-synthetic-arm64.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arm64-synthetic-benchmark
+          path: results/ci-synthetic-arm64.json
