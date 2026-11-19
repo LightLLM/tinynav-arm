@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Factory cell simulator</title>
+<meta name="description" content="Test a robot work cell before it exists: a conveyor, a six-axis arm, a pallet, a mobile robot and a worker safety zone, with throughput and missed-part results.">
+<style>
+:root{--bg:#f7f6f2;--card:#fff;--ink:#17181c;--mute:#5d6470;--line:#dedcd3;--accent:#1f5fbf;--scene:#eceae3;--grid:#c9c6ba;--good:#1c7c4a;--bad:#b3392c;--warn:#a3660a;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+@media(prefers-color-scheme:dark){:root{--bg:#111318;--card:#1a1d24;--ink:#eceef2;--mute:#9aa2b1;--line:#2c313c;--accent:#7fb0ff;--scene:#161920;--grid:#343a47;--good:#5fcf94;--bad:#ff8a7a;--warn:#f0b450}}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line)}
+header a{color:var(--mute);text-decoration:none;font-size:15px}
+.app{display:grid;grid-template-columns:minmax(0,1fr) 380px;height:calc(100% - 53px)}
+#view{position:relative;background:var(--scene);min-height:320px}
+#view canvas{display:block;width:100%;height:100%;touch-action:none}
+#hud{position:absolute;left:14px;top:12px;font:600 13px/1.5 var(--mono);color:var(--mute);pointer-events:none}
+#hud b{color:var(--ink)}
+#hint{position:absolute;left:14px;bottom:12px;font-size:13px;color:var(--mute);pointer-events:none}
+aside{border-left:1px solid var(--line);background:var(--card);overflow-y:auto;padding:18px 20px 28px}
+h2{font:600 12px/1 var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--mute);margin:22px 0 10px}
+aside>h2:first-child{margin-top:0}
+button{font:inherit;font-size:15px;padding:9px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button:disabled{opacity:.45;cursor:default}
+.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+@media(prefers-color-scheme:dark){.primary{color:#0b1220}}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.actions .wide{grid-column:1/-1}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--bg);padding:4px;border-radius:10px;border:1px solid var(--line);margin-top:8px}
+.seg button{border:0;background:transparent;padding:6px}
+.seg button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+.row{display:grid;grid-template-columns:118px 1fr 74px;gap:10px;align-items:center;margin:7px 0;font-size:14.5px}
+.row output{font-family:var(--mono);text-align:right;font-size:13px}
+input[type=range]{width:100%;accent-color:var(--accent);margin:0}
+dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:3px 14px;font-size:14.5px}
+dt{color:var(--mute)}dd{margin:0;font-family:var(--mono);text-align:right}
+.verdict{margin-top:12px;padding:12px 14px;border-radius:10px;border:1px solid var(--line);font-size:15px}
+.verdict b{display:block;font-size:17px}
+.verdict.pass b{color:var(--good)}.verdict.fail b{color:var(--bad)}.verdict.wait b{color:var(--mute)}
+.note{font-size:13.5px;color:var(--mute);margin:18px 0 0}
+.note a{color:var(--accent)}
+@media(max-width:820px){html,body{height:auto}.app{grid-template-columns:1fr;height:auto}#view{height:54vh}aside{border-left:0;border-top:1px solid var(--line)}}
+</style>
+<script type="importmap">
+{"imports":{
+  "three":"/vendor/three/three.module.js",
+  "three/examples/jsm/":"/vendor/three/jsm/",
+  "urdf-loader":"/vendor/urdf-loader/URDFLoader.js"
+}}
+</script>
+</head>
+<body>
+<header><b>Factory cell simulator</b><a href="/">&larr; Project home</a></header>
+<div class="app">
+  <div id="view"><div id="hud">Loading cell&hellip;</div><div id="hint">Drag to orbit &middot; scroll or pinch to zoom</div></div>
+  <aside>
+    <h2>Run the test</h2>
+    <div class="actions">
+      <button type="button" id="run" class="primary">Start</button>
+      <button type="button" id="reset">Reset</button>
+      <button type="button" id="worker" class="wide">Send a worker into the cell</button>
+    </div>
+    <div class="seg" role="group" aria-label="Simulation speed">
+      <button type="button" data-speed="1" aria-pressed="true">1&times;</button>
+      <button type="button" data-speed="4" aria-pressed="false">4&times;</button>
+      <button type="button" data-speed="20" aria-pressed="false">20&times;</button>
+    </div>
+
+    <h2>Cell setup</h2>
+    <div id="settings"></div>
+
+    <h2>Results</h2>
+    <dl>
+      <dt>Simulated time</dt><dd id="m-time">0 s</dd>
+      <dt>Parts packed</dt><dd id="m-placed">0</dd>
+      <dt>Parts missed</dt><dd id="m-missed">0</dd>
+      <dt>Rate, from first part</dt><dd id="m-rate">-</dd>
+      <dt>Average cycle</dt><dd id="m-cycle">-</dd>
+      <dt>Robot busy</dt><dd id="m-util">-</dd>
+      <dt>Pallets completed</dt><dd id="m-pallets">0</dd>
+      <dt>Safety stops</dt><dd id="m-stops">0</dd>
+      <dt>Time stopped</dt><dd id="m-stopped">0 s</dd>
+    </dl>
+    <div class="verdict wait" id="verdict"><b>Not enough data</b><span>Run at least 120 simulated seconds.</span></div>
+    <div class="actions" style="margin-top:10px"><button type="button" id="download" class="wide">Download report (JSON)</button></div>
+
+    <p class="note">A planning aid, not a validated model. Motion is kinematic: no gravity, inertia, collisions or grip failures, and the arm is a generic design, not a specific product. Use it to compare layouts and speeds, then confirm with the robot vendor's tools before buying or installing anything. The safety zone here is an illustration and does not replace a risk assessment.</p>
+    <p class="note">Built with <a href="https://github.com/mrdoob/three.js">three.js</a> (MIT) and <a href="https://github.com/gkjohnson/urdf-loaders">urdf-loader</a> (Apache-2.0). See also the <a href="/simulator/">single-arm simulator</a>.</p>
+  </aside>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import URDFLoader from 'urdf-loader';
+
+// ---------- cell layout (metres, Z up) ----------
+const JOINTS = ['shoulder_pan', 'shoulder_lift', 'elbow', 'wrist_pitch', 'wrist_yaw', 'wrist_roll'];
+const HOME = [-1.0, 0.5, 1.2, 0.6, 0, 0];
+const BELT = { y: -0.5, x0: -1.7, x1: 1.3, top: 0.25, width: 0.3 };
+const PART = 0.06, HOVER = 0.5, PICK_AHEAD = 0.6, PICK_BEHIND = 0.45, SIDE = 0.55;
+const PALLET = { x: 0, y: 0.55, top: 0.12, pitch: 0.1, slots: 9 };
+const ZONE = { slow: 1.6, stop: 1.0 };
+const AMR = { dock: [2.6, 0.55], station: [0.5, 0.55], speed: 1.0, load: 2.0 };
+const WORKER = { from: [2.6, 1.7], to: [0.6, 0.72], speed: 1.2, stay: 6 };
+const STEP = 1 / 60;
+const $ = id => document.getElementById(id);
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+const settings = { beltSpeed: 0.15, interval: 6, toolSpeed: 0.8, armX: 0, target: 550 };
+const SETTING_ROWS = [
+  ['beltSpeed', 'Conveyor speed', 0.05, 0.5, 0.01, v => v.toFixed(2) + ' m/s'],
+  ['interval', 'Part every', 1, 12, 0.5, v => v.toFixed(1) + ' s'],
+  ['toolSpeed', 'Robot speed', 0.2, 2.0, 0.05, v => v.toFixed(2) + ' m/s'],
+  ['armX', 'Robot position', -0.3, 0.3, 0.05, v => (v >= 0 ? '+' : '') + v.toFixed(2) + ' m'],
+  ['target', 'Target rate', 100, 2000, 50, v => v.toFixed(0) + ' /h'],
+];
+
+// ---------- scene ----------
+const view = $('view');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+view.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(42, 1, 0.05, 40);
+camera.position.set(2.6, 2.3, 2.9);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0.3, 0.25, 0);
+controls.enableDamping = true;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8f99, 1.7));
+const sun = new THREE.DirectionalLight(0xffffff, 1.5);
+sun.position.set(2, 5, 3);
+scene.add(sun);
+const world = new THREE.Group(); // URDF coordinates: Z up
+world.rotation.x = -Math.PI / 2;
+scene.add(world);
+let grid;
+function paint() {
+  scene.background = new THREE.Color(css('--scene'));
+  if (grid) scene.remove(grid);
+  grid = new THREE.GridHelper(8, 32, css('--grid'), css('--grid'));
+  scene.add(grid);
+}
+paint();
+matchMedia('(prefers-color-scheme:dark)').addEventListener('change', paint);
+
+const mat = (color, extra) => new THREE.MeshStandardMaterial({ color, ...extra });
+function box(sx, sy, sz, x, y, z, material, parent = world) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), material);
+  mesh.position.set(x, y, z);
+  parent.add(mesh);
+  return mesh;
+}
+function ring(radius, color) {
+  const mesh = new THREE.Mesh(new THREE.RingGeometry(radius - 0.012, radius + 0.012, 96), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.7, side: THREE.DoubleSide }));
+  mesh.position.z = 0.002;
+  return mesh;
+}
+// Conveyor: frame, belt and legs.
+const beltLength = BELT.x1 - BELT.x0, beltMid = (BELT.x0 + BELT.x1) / 2;
+box(beltLength, BELT.width + 0.08, 0.06, beltMid, BELT.y, BELT.top - 0.05, mat(0x6b7280));
+box(beltLength, BELT.width, 0.02, beltMid, BELT.y, BELT.top - 0.01, mat(0x23262d));
+for (const x of [BELT.x0 + 0.15, beltMid, BELT.x1 - 0.15]) box(0.06, BELT.width, BELT.top - 0.08, x, BELT.y, (BELT.top - 0.08) / 2, mat(0x6b7280));
+// Pallet stand.
+box(0.42, 0.42, PALLET.top, PALLET.x, PALLET.y, PALLET.top / 2, mat(0xb08d57));
+// Robot base group: the arm and its safety rings move together.
+const cell = new THREE.Group();
+world.add(cell);
+cell.add(ring(ZONE.stop, 0xc0392b), ring(ZONE.slow, 0xd68910));
+// Mobile robot with a tray.
+const amr = new THREE.Group();
+box(0.5, 0.4, 0.18, 0, 0, 0.11, mat(0x2f6f4f), amr);
+const amrLoad = box(0.3, 0.3, 0.07, 0, 0, 0.235, mat(0xe08e1a), amr);
+world.add(amr);
+// Worker: a simple figure.
+const worker = new THREE.Group();
+const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.9, 6, 14), mat(0x3b6ea8));
+body.rotation.x = Math.PI / 2;
+body.position.z = 0.75;
+const head = new THREE.Mesh(new THREE.SphereGeometry(0.12, 18, 12), mat(0xd9b38c));
+head.position.z = 1.5;
+worker.add(body, head);
+worker.visible = false;
+world.add(worker);
+const partGeometry = new THREE.BoxGeometry(PART, PART, PART), partMaterial = mat(0xe08e1a);
+
+function resize() {
+  const w = view.clientWidth, h = view.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(view);
+
+// ---------- arm kinematics ----------
+let robot = null, tool = null, limits = [], angles = HOME.slice();
+const scratch = new THREE.Vector3(), target = new THREE.Vector3();
+function toolAt(q) {
+  JOINTS.forEach((n, i) => robot.joints[n].setJointValue(q[i]));
+  robot.updateMatrixWorld(true);
+  return world.worldToLocal(tool.getWorldPosition(scratch)).clone();
+}
+function ikStep(goal) { // damped least squares, position only
+  const here = toolAt(angles), err = goal.clone().sub(here), eps = 1e-4, J = [];
+  for (let i = 0; i < 6; i++) { const q = angles.slice(); q[i] += eps; J.push(toolAt(q).sub(here).divideScalar(eps)); }
+  const a = [0, 0, 0, 0, 0, 0, 0, 0, 0], ax = ['x', 'y', 'z'];
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) { let s = r === c ? 0.0025 : 0; for (let i = 0; i < 6; i++) s += J[i][ax[r]] * J[i][ax[c]]; a[c * 3 + r] = s; }
+  const v = err.clone().applyMatrix3(new THREE.Matrix3().fromArray(a).invert());
+  for (let i = 0; i < 6; i++) angles[i] = Math.max(limits[i][0], Math.min(limits[i][1], angles[i] + Math.max(-0.08, Math.min(0.08, J[i].dot(v)))));
+}
+
+// ---------- simulation state ----------
+let S, running = false, speed = 1;
+function reset() {
+  if (S) S.parts.forEach(p => world.remove(p.mesh));
+  S = {
+    t: 0, parts: [], nextSpawn: 1, spawned: 0, placed: 0, missed: 0, pallets: 0, slot: 0,
+    arm: { state: 'idle', part: null, gripX: 0 }, busy: 0, lastPlace: null, firstPlace: 0, cycles: [],
+    swap: null, worker: null, safety: 'GO', stops: 0, stopped: 0, slowed: 0,
+  };
+  angles = HOME.slice();
+  cell.position.x = settings.armX;
+  if (robot) target.copy(toolAt(angles));
+  amr.position.set(AMR.dock[0], AMR.dock[1], 0);
+  amrLoad.visible = false;
+  worker.visible = false;
+  running = false;
+  $('run').textContent = 'Start';
+}
+const slotPosition = i => new THREE.Vector3(PALLET.x + (i % 3 - 1) * PALLET.pitch, PALLET.y + (Math.floor(i / 3) - 1) * PALLET.pitch, PALLET.top + PART / 2);
+function moveTarget(goal, dt, factor) { // slide the tool target toward a goal at the robot's speed
+  const gap = goal.distanceTo(target), move = settings.toolSpeed * factor * dt;
+  if (gap <= move) { target.copy(goal); return true; }
+  target.lerp(goal, move / gap);
+  return false;
+}
+function travel(pos, to, speedNow, dt) { // straight-line motion on the floor; true on arrival
+  const dx = to[0] - pos.x, dy = to[1] - pos.y, gap = Math.hypot(dx, dy), move = speedNow * dt;
+  if (gap <= move) { pos.x = to[0]; pos.y = to[1]; return true; }
+  pos.x += dx / gap * move; pos.y += dy / gap * move;
+  return false;
+}
+
+function step(dt) {
+  S.t += dt;
+  const armX = settings.armX;
+
+  // Conveyor: spawn and advance parts; parts that reach the end are lost.
+  if (S.t >= S.nextSpawn) {
+    const mesh = new THREE.Mesh(partGeometry, partMaterial);
+    world.add(mesh);
+    S.parts.push({ mesh, x: BELT.x0 + 0.1, state: 'belt', pos: new THREE.Vector3() });
+    S.spawned++;
+    S.nextSpawn += settings.interval;
+  }
+  for (const p of S.parts) if (p.state === 'belt') {
+    p.x += settings.beltSpeed * dt;
+    p.pos.set(p.x, BELT.y, BELT.top + PART / 2);
+    if (p.x > BELT.x1) { p.state = 'lost'; S.missed++; world.remove(p.mesh); if (S.arm.part === p) { S.arm.part = null; S.arm.state = 'idle'; } }
+  }
+
+  // Worker and safety zone: distance from the worker to the robot base sets the speed limit.
+  let factor = 1, level = 'GO';
+  if (S.worker) {
+    const w = S.worker;
+    if (w.phase === 'in' && travel(worker.position, WORKER.to, WORKER.speed, dt)) { w.phase = 'stay'; w.t = 0; }
+    else if (w.phase === 'stay' && (w.t += dt) >= WORKER.stay) w.phase = 'out';
+    else if (w.phase === 'out' && travel(worker.position, WORKER.from, WORKER.speed, dt)) { S.worker = null; worker.visible = false; }
+    const d = Math.hypot(worker.position.x - armX, worker.position.y);
+    if (S.worker && d < ZONE.stop) { level = 'STOP'; factor = 0; } else if (S.worker && d < ZONE.slow) { level = 'SLOW'; factor = 0.25; }
+  }
+  if (level === 'STOP' && S.safety !== 'STOP') S.stops++;
+  if (level === 'STOP') S.stopped += dt;
+  if (level === 'SLOW') S.slowed += dt;
+  S.safety = level;
+
+  // Mobile robot swaps a full pallet for an empty one.
+  if (S.swap) {
+    const w = S.swap;
+    if (w.phase === 'in' && travel(amr.position, AMR.station, AMR.speed, dt)) { w.phase = 'load'; w.t = 0; }
+    else if (w.phase === 'load' && (w.t += dt) >= AMR.load) {
+      S.parts = S.parts.filter(p => { if (p.state === 'pallet') { world.remove(p.mesh); return false; } return true; });
+      S.slot = 0; S.pallets++; amrLoad.visible = true; w.phase = 'out';
+    } else if (w.phase === 'out' && travel(amr.position, AMR.dock, AMR.speed, dt)) { S.swap = null; amrLoad.visible = false; }
+  }
+  const palletReady = !S.swap || S.swap.phase === 'out';
+
+  // Robot arm task: chase a part on the belt, grip it, carry it to the next pallet slot.
+  const arm = S.arm, hoverOver = (x, y) => scratch2.set(x, y, HOVER).clone();
+  if (arm.state !== 'idle') S.busy += dt;
+  if (arm.state === 'idle') {
+    let pick = null;
+    for (const p of S.parts) if (p.state === 'belt' && p.x > armX - PICK_AHEAD && p.x < armX + PICK_BEHIND - 0.15 && (!pick || p.x > pick.x)) pick = p;
+    if (pick) { arm.part = pick; arm.state = 'track'; } else moveTarget(hoverOver(armX - 0.15, BELT.y), dt, factor);
+  } else if (arm.state === 'track' || arm.state === 'descend') {
+    const p = arm.part;
+    if (p.x > armX + PICK_BEHIND) { arm.part = null; arm.state = 'idle'; } // out of reach: give up, the belt carries it away
+    else if (arm.state === 'track') { if (moveTarget(hoverOver(p.x, BELT.y), dt, factor)) arm.state = 'descend'; }
+    else if (moveTarget(new THREE.Vector3(p.x, BELT.y, BELT.top + PART + 0.02), dt, factor) && toolAt(angles).distanceTo(target) < 0.015) {
+      p.state = 'held'; arm.gripX = p.x; arm.state = 'lift';
+    }
+  } else if (arm.state === 'lift') {
+    if (moveTarget(hoverOver(arm.gripX, BELT.y), dt, factor)) arm.state = 'swing';
+  } else if (arm.state === 'swing' || arm.state === 'return') {
+    // Go around the base, not over it: a straight line across the robot's own axis is a singularity.
+    if (moveTarget(hoverOver(armX + SIDE, 0), dt, factor)) arm.state = arm.state === 'swing' ? 'carry' : 'idle';
+  } else if (arm.state === 'carry') {
+    const s = slotPosition(S.slot);
+    if (moveTarget(hoverOver(s.x, s.y), dt, factor) && palletReady) arm.state = 'lower';
+  } else if (arm.state === 'lower') {
+    const s = slotPosition(S.slot);
+    if (moveTarget(new THREE.Vector3(s.x, s.y, s.z + PART / 2 + 0.02), dt, factor) && toolAt(angles).distanceTo(target) < 0.015) {
+      arm.part.state = 'pallet'; arm.part.pos.copy(s); arm.part = null;
+      S.placed++; S.slot++;
+      if (S.lastPlace !== null) S.cycles.push(S.t - S.lastPlace); else S.firstPlace = S.t;
+      S.lastPlace = S.t;
+      if (S.slot === PALLET.slots) S.swap = { phase: 'in', t: 0 };
+      arm.state = 'raise';
+    }
+  } else if (arm.state === 'raise') {
+    if (moveTarget(hoverOver(target.x, target.y), dt, factor)) arm.state = 'return';
+  }
+  if (factor > 0) for (let k = 0; k < 3; k++) ikStep(target);
+  const tip = toolAt(angles);
+  for (const p of S.parts) { if (p.state === 'held') p.pos.set(tip.x, tip.y, tip.z - PART / 2 - 0.02); p.mesh.position.copy(p.pos); }
+}
+const scratch2 = new THREE.Vector3();
+
+// ---------- results ----------
+function results() {
+  const done = S.placed + S.missed;
+  return {
+    seconds: +S.t.toFixed(1), packed: S.placed, missed: S.missed,
+    missedPercent: done ? +(100 * S.missed / done).toFixed(1) : 0,
+    // Measured from the first packed part, so the empty conveyor at start-up does not drag the rate down.
+    ratePerHour: S.placed > 1 ? Math.round((S.placed - 1) / ((S.t - S.firstPlace) / 3600)) : 0,
+    averageCycleSeconds: S.cycles.length ? +(S.cycles.reduce((a, b) => a + b, 0) / S.cycles.length).toFixed(2) : null,
+    robotBusyPercent: S.t > 0 ? Math.round(100 * S.busy / S.t) : 0,
+    palletsCompleted: S.pallets, safetyStops: S.stops, secondsStopped: +S.stopped.toFixed(1), secondsSlowed: +S.slowed.toFixed(1),
+  };
+}
+function verdict(r) {
+  if (r.seconds < 120) return ['wait', 'Not enough data', 'Run at least 120 simulated seconds.'];
+  const rateOk = r.ratePerHour >= settings.target, missOk = r.missedPercent <= 1;
+  if (rateOk && missOk) return ['pass', 'Pass', `Packing ${r.ratePerHour}/h against a target of ${settings.target}/h, with ${r.missedPercent}% of parts missed.`];
+  const why = [];
+  if (!rateOk) why.push(`rate ${r.ratePerHour}/h is below the ${settings.target}/h target`);
+  if (!missOk) why.push(`${r.missedPercent}% of parts ran off the conveyor (limit 1%)`);
+  return ['fail', 'Fail', why.join('; ') + '.'];
+}
+function show() {
+  const r = results(), set = (id, text) => { $(id).textContent = text; };
+  set('m-time', r.seconds.toFixed(0) + ' s'); set('m-placed', r.packed); set('m-missed', `${r.missed} (${r.missedPercent}%)`);
+  set('m-rate', r.packed > 1 ? r.ratePerHour + ' /h' : '-'); set('m-cycle', r.averageCycleSeconds === null ? '-' : r.averageCycleSeconds + ' s');
+  set('m-util', r.robotBusyPercent + '%'); set('m-pallets', r.palletsCompleted); set('m-stops', r.safetyStops); set('m-stopped', r.secondsStopped + ' s');
+  const [kind, title, text] = verdict(r), v = $('verdict');
+  v.className = 'verdict ' + kind; v.innerHTML = `<b>${title}</b><span></span>`; v.lastChild.textContent = text;
+  $('hud').innerHTML = `Robot: <b>${S.arm.state}</b> &middot; Safety: <b>${S.safety}</b>${S.swap ? ' &middot; Pallet swap' : ''}`;
+  $('worker').disabled = !!S.worker;
+}
+
+// ---------- interface ----------
+for (const [key, label, min, max, stepSize, format] of SETTING_ROWS) {
+  const div = document.createElement('div'); div.className = 'row';
+  div.innerHTML = `<label for="s-${key}">${label}</label><input type="range" id="s-${key}" min="${min}" max="${max}" step="${stepSize}" value="${settings[key]}"><output></output>`;
+  const input = div.querySelector('input'), out = div.querySelector('output');
+  out.textContent = format(settings[key]);
+  input.addEventListener('input', () => { settings[key] = +input.value; out.textContent = format(settings[key]); if (key === 'armX') cell.position.x = settings.armX; });
+  $('settings').appendChild(div);
+}
+$('run').onclick = () => { running = !running; $('run').textContent = running ? 'Pause' : 'Resume'; };
+$('reset').onclick = () => { reset(); show(); };
+$('worker').onclick = () => { S.worker = { phase: 'in', t: 0 }; worker.position.set(WORKER.from[0], WORKER.from[1], 0); worker.visible = true; };
+document.querySelectorAll('[data-speed]').forEach(b => b.onclick = () => {
+  speed = +b.dataset.speed;
+  document.querySelectorAll('[data-speed]').forEach(o => o.setAttribute('aria-pressed', o === b));
+});
+$('download').onclick = () => {
+  const [, title, text] = verdict(results());
+  const report = { tool: 'Factory cell simulator', note: 'Kinematic planning aid; not a validated model.', settings: { ...settings }, results: results(), verdict: title, reason: text };
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }));
+  link.download = 'factory-cell-report.json';
+  link.click();
+  URL.revokeObjectURL(link.href);
+};
+
+new URDFLoader().load('/robots/arm6.urdf', loaded => {
+  robot = loaded; tool = robot.links.tool; cell.add(robot);
+  limits = JOINTS.map(n => [robot.joints[n].limit.lower, robot.joints[n].limit.upper]);
+  reset(); resize(); show();
+  // Test hook: advance the simulation without rendering.
+  window.factory = { settings, results, verdict: () => verdict(results()), reset, runFor(seconds) { for (let i = 0, n = Math.round(seconds / STEP); i < n; i++) step(STEP); show(); },
+    sendWorker: () => $('worker').onclick(), get state() { return S; } };
+  renderer.setAnimationLoop(frame);
+}, undefined, () => { $('hud').textContent = 'Could not load the robot file.'; });
+
+const clock = new THREE.Clock();
+let backlog = 0;
+function frame() {
+  const elapsed = Math.min(clock.getDelta(), 0.1);
+  if (running) {
+    backlog += elapsed * speed;
+    let budget = 40; // cap work per frame so a slow device stays responsive
+    while (backlog >= STEP && budget-- > 0) { step(STEP); backlog -= STEP; }
+    if (budget <= 0) backlog = 0;
+    show();
+  }
+  controls.update();
+  renderer.render(scene, camera);
+}
+</script>
+</body>
+</html>
