@@ -8,3 +8,6 @@ dashboard/dist/
 dashboard/.sites-runtime/
 models/*.onnx
 !models/README.md
+results/*.pt
+*.egg-info/
+third_party/

@@ -1,0 +1,139 @@
+{
+  "bodies": {
+    "g1": {
+      "class": "humanoid",
+      "episode_steps": 500
+    },
+    "ur5e": {
+      "class": "industrial arm",
+      "episode_steps": 150
+    },
+    "x2": {
+      "class": "drone",
+      "episode_steps": 500
+    },
+    "go2": {
+      "class": "quadruped",
+      "episode_steps": 500
+    }
+  },
+  "task": "hold the reference pose: stand (humanoid, quadruped), hover (drone), return to home (arm)",
+  "seeds": [
+    0,
+    1
+  ],
+  "eval_episodes_per_seed": 10,
+  "demonstrations_per_body": 20,
+  "train_steps_on_target": 2000,
+  "parameters": 920458,
+  "torch": "2.15.0+cu132",
+  "machine": "x86_64",
+  "wall_seconds": 2676.5,
+  "results": {
+    "g1/no_command": {
+      "success_rate_mean": 0.0,
+      "success_rate_per_seed": [
+        0.0
+      ],
+      "mean_steps": 94.3,
+      "reflex_modified_rate": 0.0,
+      "reflex_stops": 0
+    },
+    "g1/teacher": {
+      "success_rate_mean": 1.0,
+      "success_rate_per_seed": [
+        1.0
+      ],
+      "mean_steps": 500.0,
+      "reflex_modified_rate": 0.0,
+      "reflex_stops": 0
+    },
+    "ur5e/teacher": {
+      "success_rate_mean": 1.0,
+      "success_rate_per_seed": [
+        1.0
+      ],
+      "mean_steps": 150.0,
+      "reflex_modified_rate": 0.0,
+      "reflex_stops": 0
+    },
+    "x2/teacher": {
+      "success_rate_mean": 1.0,
+      "success_rate_per_seed": [
+        1.0
+      ],
+      "mean_steps": 500.0,
+      "reflex_modified_rate": 0.0,
+      "reflex_stops": 0
+    },
+    "go2/teacher": {
+      "success_rate_mean": 1.0,
+      "success_rate_per_seed": [
+        1.0
+      ],
+      "mean_steps": 500.0,
+      "reflex_modified_rate": 0.0,
+      "reflex_stops": 0
+    },
+    "g1/specialist": {
+      "success_rate_mean": 0.0,
+      "success_rate_per_seed": [
+        0.0,
+        0.0
+      ],
+      "mean_steps": 89.4,
+      "reflex_modified_rate": 0.0,
+      "reflex_stops": 0
+    },
+    "g1/shared": {
+      "success_rate_mean": 0.0,
+      "success_rate_per_seed": [
+        0.0,
+        0.0
+      ],
+      "mean_steps": 86.2,
+      "reflex_modified_rate": 0.0,
+      "reflex_stops": 0
+    },
+    "ur5e/shared": {
+      "success_rate_mean": 0.0,
+      "success_rate_per_seed": [
+        0.0,
+        0.0
+      ],
+      "mean_steps": 150.0,
+      "reflex_modified_rate": 0.0,
+      "reflex_stops": 0
+    },
+    "x2/shared": {
+      "success_rate_mean": 0.0,
+      "success_rate_per_seed": [
+        0.0,
+        0.0
+      ],
+      "mean_steps": 92.1,
+      "reflex_modified_rate": 0.0,
+      "reflex_stops": 0
+    },
+    "go2/shared": {
+      "success_rate_mean": 0.0,
+      "success_rate_per_seed": [
+        0.0,
+        0.0
+      ],
+      "mean_steps": 54.0,
+      "reflex_modified_rate": 0.0,
+      "reflex_stops": 0
+    },
+    "g1/shared_with_reflex": {
+      "success_rate_mean": 0.0,
+      "success_rate_per_seed": [
+        0.0,
+        0.0
+      ],
+      "mean_steps": 87.2,
+      "reflex_modified_rate": 0.318,
+      "reflex_stops": 0
+    }
+  }
+}
