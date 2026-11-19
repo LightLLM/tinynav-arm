@@ -91,6 +91,23 @@ Arm64 cloud runner. Record the exact device, CPU, OS, model checksum, ONNX
 Runtime version, thread configuration, warmup count, run count, model size,
 latency percentiles, memory, throughput, and accuracy delta.
 
+## Unified Embodied Brain prototype (humanoid first)
+
+`ueb/` is a research prototype of one policy that controls different robot bodies with the same
+weights, tested first on a simulated humanoid. The body is described to the model joint by joint,
+so nothing in the network depends on how many joints a robot has. A deterministic reflex layer
+(`ueb/safety.py`) sits between the learned model and the motors, following the same idea as
+`tinynav/controller.py`.
+
+```bash
+pip install -e '.[dev,ueb]'
+python tools/ueb_humanoid.py
+```
+
+The script trains a humanoid-only specialist and a shared model, compares them in MuJoCo, and
+writes `results/ueb_humanoid.json`. See [docs/TECH_STACK.md](docs/TECH_STACK.md) for the full
+stack, the limits of the prototype, and the path to a real humanoid.
+
 ## Repository map
 
 ```text

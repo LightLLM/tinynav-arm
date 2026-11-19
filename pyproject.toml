@@ -14,6 +14,10 @@ dependencies = ["fastapi>=0.115,<1", "uvicorn[standard]>=0.30,<1", "numpy>=1.26,
 [project.optional-dependencies]
 onnx = ["onnx>=1.16,<2", "onnxruntime>=1.19,<2", "opencv-python-headless>=4.10,<5"]
 dev = ["httpx>=0.27,<1", "pytest>=8,<9", "ruff>=0.8,<1"]
+ueb = ["torch>=2.2", "mujoco>=3.1", "gymnasium[mujoco]>=1.0"]
+
+[tool.setuptools]
+packages = ["tinynav", "ueb"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
