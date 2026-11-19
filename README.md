@@ -91,6 +91,21 @@ Arm64 cloud runner. Record the exact device, CPU, OS, model checksum, ONNX
 Runtime version, thread configuration, warmup count, run count, model size,
 latency percentiles, memory, throughput, and accuracy delta.
 
+## Robot arm simulator
+
+A six-axis arm described once in `public/robots/arm6.urdf` and simulated two ways:
+
+- **In the browser** at `/simulator/`: move joints, move the tool with inverse kinematics, and run
+  a pick-and-place. Kinematic only (no gravity or collisions). Uses three.js and urdf-loader,
+  vendored in `public/vendor/`.
+- **In Python** with `robosim`: the same kinematics in NumPy, plus MuJoCo physics with a position
+  servo on each joint.
+
+```bash
+pip install -e '.[dev,ueb]'
+python tools/sim_arm.py --target 0.45 0.2 0.3
+```
+
 ## Cloud deployment
 
 The repository deploys to Vercel as one project: `tinynav.api:app` runs as the API (set in
