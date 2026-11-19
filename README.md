@@ -93,11 +93,16 @@ latency percentiles, memory, throughput, and accuracy delta.
 
 ## Robot arm simulator
 
-A six-axis arm described once in `public/robots/arm6.urdf` and simulated two ways:
+A six-axis arm described once in `public/robots/arm6.urdf` and simulated three ways:
 
 - **In the browser** at `/simulator/`: move joints, move the tool with inverse kinematics, and run
   a pick-and-place. Kinematic only (no gravity or collisions). Uses three.js and urdf-loader,
   vendored in `public/vendor/`.
+- **As a factory cell** at `/factory/`: a conveyor feeds parts, the arm packs them onto a pallet, a
+  mobile robot swaps full pallets, and a worker can walk into the safety zone. Set conveyor speed,
+  part spacing, robot speed, robot position and a target rate; it reports packed and missed parts,
+  rate, cycle time, safety stops and a pass or fail, and exports the result as JSON. Kinematic
+  planning aid only, not a validated model.
 - **In Python** with `robosim`: the same kinematics in NumPy, plus MuJoCo physics with a position
   servo on each joint.
 
