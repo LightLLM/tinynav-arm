@@ -10,3 +10,4 @@ models/*.onnx
 !models/README.md
 results/*.pt
 *.egg-info/
+third_party/

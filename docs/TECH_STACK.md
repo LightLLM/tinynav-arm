@@ -7,7 +7,7 @@ into what runs in this repository today and what to add at each later stage.
 
 | Layer | In this repo now | Add next | Add for a real robot |
 | --- | --- | --- | --- |
-| Robot body | Gymnasium `Humanoid-v5` (17 joints, MuJoCo) | Unitree G1 model from MuJoCo Menagerie | Unitree G1 (a developer/EDU unit with SDK access) |
+| Robot body | Unitree G1 model from MuJoCo Menagerie (29 joints), plus an arm, a drone and a quadruped; Gymnasium `Humanoid-v5` as a toy | Walking and reaching tasks on the G1 | Unitree G1 (a developer/EDU unit with SDK access) |
 | Physics | MuJoCo on CPU | GPU-parallel simulation (MuJoCo MJX / Playground or Isaac Lab) | - |
 | Brain | `ueb.model.UnifiedBrain`: small transformer, per-joint tokens, flow-matching action head, future-state prediction head | Cameras and language through a pretrained VLA (SmolVLA, then GR00T N1.7 or pi0.5) via LeRobot | Same model, small tier on board |
 | Body description | `ueb.embodiment`: joint type, axis, limits, gear, tree depth, link mass, read from the MuJoCo model | Same code on the G1 model | Same |
@@ -63,6 +63,28 @@ at least one joint just outside its stated range, so the layer blocks commands t
 further. That is the layer doing what it was written to do, and it shows the limits need tuning to
 the body before it is useful.
 
+## Real robot models
+
+`ueb/menagerie.py` loads real robot models from
+[MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) behind the same per-joint
+interface, one for each robot class in the paper:
+
+| Body | Class | Actuators | Task | Scripted teacher |
+| --- | --- | --- | --- | --- |
+| Unitree G1 | Humanoid | 29 position-controlled joints | Stand for 10 s | Steps joint targets to the standing pose |
+| Universal Robots UR5e | Industrial arm | 6 position-controlled joints | Return home from a random pose within 3 s | Steps joint targets to home |
+| Skydio X2 | Drone | 4 rotors | Hover in place for 10 s | Position and attitude PD loop with motor mixing |
+| Unitree Go2 | Quadruped | 12 torque-controlled joints | Stand for 10 s | Joint PD loop |
+
+The models are not copied into this repository. Fetch them once:
+
+```bash
+git clone --depth 1 https://github.com/google-deepmind/mujoco_menagerie third_party/mujoco_menagerie
+python tools/ueb_fleet.py               # or set UEB_MENAGERIE to an existing checkout
+```
+
+Each model keeps its own licence inside its Menagerie folder; read it before redistributing.
+
 ## Limits of this prototype
 
 - **The teacher is weak.** A PD controller holding the reset pose keeps the humanoid up for well
@@ -75,7 +97,7 @@ the body before it is useful.
 
 ## Order of work from here
 
-1. Replace `Humanoid-v5` with the Unitree G1 model and joint position targets instead of torques.
+1. Done: the Unitree G1 model with joint position targets (`ueb/menagerie.py`).
 2. Train a standing and walking controller with RL, and use it as the teacher and as the low-level layer.
 3. Add a camera and a language instruction by putting a pretrained VLA in the trunk.
 4. Add a fourth and fifth body (an arm and a quadrotor) and rerun the specialist-vs-shared comparison.

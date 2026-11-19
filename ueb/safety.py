@@ -31,6 +31,10 @@ PRESETS = {
     "humanoid": ReflexConfig(max_command=0.4, max_delta=0.2, min_upright=0.5, min_height_m=0.8),
     "walker": ReflexConfig(max_command=1.0, max_delta=0.5, min_upright=0.5, min_height_m=0.7),
     "ant": ReflexConfig(max_command=1.0, max_delta=0.5, min_upright=0.2, min_height_m=0.2),
+    "g1": ReflexConfig(max_command=1.0, max_delta=1.0, min_upright=0.5, min_height_m=0.5),
+    "go2": ReflexConfig(max_command=1.0, max_delta=1.0, min_upright=0.3, min_height_m=0.12),
+    "ur5e": ReflexConfig(max_command=1.0, max_delta=1.0, min_upright=-2.0, min_height_m=-1.0),
+    "x2": ReflexConfig(max_command=1.0, max_delta=1.0, min_upright=0.3, min_height_m=0.03),
 }
 
 

@@ -22,18 +22,31 @@ class EmbodimentSpec:
     joint_lower: np.ndarray  # [J] radians or metres
     joint_upper: np.ndarray  # [J]
     control_hz: float
+    # "effort": the command is a normalised motor effort. "position_delta": the command is a
+    # normalised step from the joint's current position, turned into a position target.
+    command_mode: str = "effort"
 
     @property
     def num_joints(self) -> int:
         return len(self.joint_names)
 
 
-def spec_from_mujoco(name: str, model, control_hz: float) -> EmbodimentSpec:
+def spec_from_mujoco(name: str, model, control_hz: float, command_mode: str = "effort") -> EmbodimentSpec:
     """Build the body descriptor straight from a MuJoCo model (works for any morphology)."""
     import mujoco
 
     names, rows, lower, upper = [], [], [], []
     for a in range(model.nu):
+        if int(model.actuator_trntype[a]) == mujoco.mjtTrn.mjTRN_SITE:
+            # A thruster or rotor: no joint, described by where it sits and which way it pushes.
+            site = int(model.actuator_trnid[a, 0])
+            body = int(model.site_bodyid[site])
+            rows.append([0.0, 0.0, *model.actuator_gear[a, :3], -1.0, 1.0,
+                         float(model.actuator_gear[a, 5]) * 10.0, *model.site_pos[site], 0.0])
+            names.append(mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, a) or f"rotor_{a}")
+            lower.append(-np.inf)
+            upper.append(np.inf)
+            continue
         j = int(model.actuator_trnid[a, 0])
         body = int(model.jnt_bodyid[j])
         depth, b = 0, body
@@ -68,4 +81,5 @@ def spec_from_mujoco(name: str, model, control_hz: float) -> EmbodimentSpec:
         joint_lower=np.asarray(lower, dtype=np.float32),
         joint_upper=np.asarray(upper, dtype=np.float32),
         control_hz=control_hz,
+        command_mode=command_mode,
     )

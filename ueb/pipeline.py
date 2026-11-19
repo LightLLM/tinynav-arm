@@ -5,10 +5,25 @@ from dataclasses import dataclass
 import numpy as np
 import torch
 
-from .env import BodyEnv
+from .env import BODIES, BodyEnv
+from .menagerie import MenagerieEnv, ReferenceTeacher
 from .model import BrainConfig, UnifiedBrain
 from .safety import PRESETS, ReflexLayer
 from .teacher import PoseHoldTeacher
+
+
+def make_env(body: str):
+    """Gymnasium toy bodies and Menagerie robot models share one interface."""
+    return BodyEnv(body) if body in BODIES else MenagerieEnv(body)
+
+
+def make_teacher(env):
+    return PoseHoldTeacher(env) if isinstance(env, BodyEnv) else ReferenceTeacher(env)
+
+
+def episode_limit(env, default: int = 300) -> int:
+    return env.info.episode_steps if isinstance(env, MenagerieEnv) else default
+
 
 VELOCITY_SCALE = 0.1  # joint velocities are an order of magnitude larger than positions
 
@@ -35,11 +50,12 @@ class BodyData:
                 "future_joints": self.future_joints[idx]}
 
 
-def collect(body: str, embodiment_id: int, episodes: int, horizon: int, max_steps: int = 300,
+def collect(body: str, embodiment_id: int, episodes: int, horizon: int, max_steps: int | None = None,
             noise: float = 0.05, seed: int = 0) -> BodyData:
     """Roll out the teacher with small exploration noise and record clean teacher actions as labels."""
-    env = BodyEnv(body)
-    teacher = PoseHoldTeacher(env)
+    env = make_env(body)
+    teacher = make_teacher(env)
+    max_steps = max_steps or episode_limit(env)
     rng = np.random.default_rng(seed)
     joints, roots, chunks, futures = [], [], [], []
     for episode in range(episodes):
@@ -91,13 +107,15 @@ class RolloutStats:
     steps: list[int]
     reflex_modified_rate: float
     reflex_stops: int
+    success_rate: float | None = None
 
 
-def rollout(env: BodyEnv, policy, episodes: int = 10, max_steps: int = 300, use_reflex: bool = True,
+def rollout(env, policy, episodes: int = 10, max_steps: int | None = None, use_reflex: bool = True,
             seed_offset: int = 50_000) -> RolloutStats:
     """Run ``policy(obs) -> command`` for several seeds. Episode length is steps before falling."""
     reflex = ReflexLayer(env.spec, PRESETS[env.body])
-    lengths, modified, total, stops = [], 0, 0, 0
+    max_steps = max_steps or episode_limit(env)
+    lengths, modified, total, stops, successes = [], 0, 0, 0, []
     for episode in range(episodes):
         obs = env.reset(seed=seed_offset + episode)
         reflex.reset()
@@ -116,13 +134,16 @@ def rollout(env: BodyEnv, policy, episodes: int = 10, max_steps: int = 300, use_
             if fell:
                 break
         lengths.append(count)
-    return RolloutStats(float(np.mean(lengths)), lengths, modified / max(total, 1), stops)
+        if hasattr(env, "success"):
+            successes.append(env.success())
+    return RolloutStats(float(np.mean(lengths)), lengths, modified / max(total, 1), stops,
+                        float(np.mean(successes)) if successes else None)
 
 
 class BrainPolicy:
     """Receding-horizon execution: sample an action chunk, run the first few steps, then replan."""
 
-    def __init__(self, model: UnifiedBrain, env: BodyEnv, embodiment_id: int, replan_every: int = 4,
+    def __init__(self, model: UnifiedBrain, env, embodiment_id: int, replan_every: int = 4,
                  flow_steps: int = 8, seed: int = 0) -> None:
         self.model, self.env, self.embodiment_id = model, env, embodiment_id
         self.replan_every, self.flow_steps = replan_every, flow_steps
@@ -146,8 +167,8 @@ class BrainPolicy:
 
 
 class TeacherPolicy:
-    def __init__(self, env: BodyEnv) -> None:
-        self.teacher = PoseHoldTeacher(env)
+    def __init__(self, env) -> None:
+        self.teacher = make_teacher(env)
 
     def reset(self, obs) -> None:
         self.teacher.reset(obs.joints)
@@ -157,7 +178,7 @@ class TeacherPolicy:
 
 
 class ZeroPolicy:
-    def __init__(self, env: BodyEnv) -> None:
+    def __init__(self, env) -> None:
         self.size = env.spec.num_joints
 
     def __call__(self, obs) -> np.ndarray:
