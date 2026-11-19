@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unified Embodied Brain: one model, many robot bodies</title>
+<meta name="description" content="An open research prototype of a single AI policy that controls a humanoid, an industrial arm, a drone and a quadruped with the same weights. Includes measured results, including the ones that failed.">
+<style>
+:root{--bg:#f7f6f2;--card:#fff;--ink:#17181c;--mute:#5d6470;--line:#dedcd3;--accent:#1f5fbf;--accent-soft:#e6eefb;--good:#1c7c4a;--bad:#b3392c;--warn-soft:#fbf1dc;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+@media(prefers-color-scheme:dark){:root{--bg:#111318;--card:#1a1d24;--ink:#eceef2;--mute:#9aa2b1;--line:#2c313c;--accent:#7fb0ff;--accent-soft:#1c2a44;--good:#5fcf94;--bad:#ff8a7a;--warn-soft:#33290f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1040px;margin:0 auto;padding:0 24px}
+header{padding:20px 0;border-bottom:1px solid var(--line)}
+header .wrap{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.brand{font-weight:700;letter-spacing:-.01em}
+nav a{color:var(--mute);text-decoration:none;margin-left:20px;font-size:15px}
+nav a:hover{color:var(--ink)}
+.hero{padding:88px 0 64px}
+.eyebrow{font:600 13px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+h1{font-size:clamp(38px,6.4vw,68px);line-height:1.04;letter-spacing:-.035em;margin:18px 0 22px;max-width:15ch}
+.lede{font-size:clamp(18px,2.2vw,21px);color:var(--mute);max-width:62ch;margin:0}
+.cta{margin-top:32px;display:flex;gap:12px;flex-wrap:wrap}
+.btn{display:inline-block;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:600;font-size:16px;border:1px solid var(--line);color:var(--ink);background:var(--card)}
+.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.status{margin-top:40px;padding:16px 20px;background:var(--warn-soft);border-radius:12px;max-width:74ch;font-size:16px}
+section{padding:64px 0;border-top:1px solid var(--line)}
+h2{font-size:clamp(26px,3.4vw,36px);letter-spacing:-.02em;line-height:1.15;margin:0 0 12px;max-width:26ch}
+.sub{color:var(--mute);max-width:66ch;margin:0 0 32px}
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px}
+.card h3{margin:0 0 6px;font-size:18px}
+.card p{margin:0;color:var(--mute);font-size:15.5px}
+.tag{font:600 12px/1 var(--mono);color:var(--accent);letter-spacing:.06em;text-transform:uppercase;display:block;margin-bottom:10px}
+.stack{display:grid;gap:10px;max-width:760px}
+.layer{border:1px solid var(--line);border-radius:12px;padding:14px 18px;background:var(--card)}
+.layer b{display:block}
+.layer span{color:var(--mute);font-size:15px}
+.layer.trunk{border:2px solid var(--accent);background:var(--accent-soft)}
+.layer.out{background:transparent;border-style:dashed}
+.arrow{text-align:center;color:var(--mute);line-height:1;font-size:14px}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:15.5px;min-width:560px}
+th,td{text-align:left;padding:12px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:600 12px/1.3 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
+tr:last-child td{border-bottom:0}
+td.num{font-family:var(--mono);white-space:nowrap}
+.ok{color:var(--good);font-weight:600}.no{color:var(--bad);font-weight:600}
+.bars{display:grid;gap:14px;max-width:760px}
+.bar{display:grid;grid-template-columns:190px 1fr 64px;gap:12px;align-items:center;font-size:15.5px}
+.track{height:22px;background:var(--line);border-radius:6px;overflow:hidden}
+.fill{height:100%;background:var(--mute);border-radius:6px}
+.fill.a{background:var(--accent)}
+.bar .v{font-family:var(--mono);text-align:right}
+.note{color:var(--mute);font-size:15px;max-width:70ch;margin-top:18px}
+pre{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;overflow-x:auto;font:14.5px/1.55 var(--mono);margin:0}
+ol.steps{padding-left:22px;max-width:70ch}ol.steps li{margin-bottom:10px}
+footer{padding:40px 0 64px;border-top:1px solid var(--line);color:var(--mute);font-size:15px}
+a{color:var(--accent)}
+@media(max-width:560px){.bar{grid-template-columns:1fr 56px}.bar .track{grid-column:1/-1;order:3}.hero{padding:56px 0 40px}nav a{margin:0 16px 0 0}}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div class="brand">Unified Embodied Brain</div>
+  <nav><a href="#idea">Idea</a><a href="#robots">Robots</a><a href="#results">Results</a><a href="#run">Run it</a></nav>
+</div></header>
+
+<main>
+<div class="wrap hero">
+  <span class="eyebrow">Open research prototype</span>
+  <h1>One brain for every robot body.</h1>
+  <p class="lede">Drones, humanoids, arms and legged robots are usually run by separate AI models. This project tests whether a single model, with one set of weights, can control all of them by taking the robot's body as an input.</p>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/LightLLM/tinynav-arm">View the code</a>
+    <a class="btn" href="#results">See the results</a>
+  </div>
+  <p class="status"><b>Where it stands:</b> the architecture runs on four robot models in simulation and passes its tests. The learned policies do not yet complete any task on those robots. The numbers below include that failure.</p>
+</div>
+
+<section id="idea"><div class="wrap">
+  <h2>The body is an input, not an assumption</h2>
+  <p class="sub">Every joint or rotor becomes a token that carries its own physical description. The network has no layer whose shape depends on the robot, so a 29-joint humanoid and a 4-rotor drone pass through the same weights.</p>
+  <div class="grid">
+    <div class="card"><span class="tag">Describe</span><h3>Per-joint tokens</h3><p>Joint type, axis, limits, actuator strength and position in the body are read straight from the robot model.</p></div>
+    <div class="card"><span class="tag">Share</span><h3>One trunk</h3><p>A transformer with an action head and a head that predicts the robot's next state. Only one small vector per body is robot-specific.</p></div>
+    <div class="card"><span class="tag">Guard</span><h3>Reflex layer</h3><p>A deterministic filter between the model and the motors that clamps commands and stops on a fall. A demonstration, not certified safety software.</p></div>
+  </div>
+  <h2 style="margin-top:56px">How a command is produced</h2>
+  <div class="stack">
+    <div class="layer"><b>Sensors as tokens</b><span>Joint positions and velocities, body orientation and motion. Cameras, sound, touch and language are designed for but not built yet.</span></div>
+    <div class="arrow">&darr;</div>
+    <div class="layer"><b>Body description</b><span>One description per joint or rotor, plus a learned prompt per robot.</span></div>
+    <div class="arrow">&darr;</div>
+    <div class="layer trunk"><b>Shared trunk: the same weights on every robot</b><span>About 920,000 parameters in this prototype.</span></div>
+    <div class="arrow">&darr;</div>
+    <div class="layer"><b>Action chunk</b><span>Eight control steps per joint, generated by flow matching.</span></div>
+    <div class="arrow">&darr;</div>
+    <div class="layer out"><b>Outside the brain</b><span>Reflex layer, then the robot's own low-level controllers.</span></div>
+  </div>
+</div></section>
+
+<section id="robots"><div class="wrap">
+  <h2>Four robot classes, one interface</h2>
+  <p class="sub">Robot models come from the open MuJoCo Menagerie collection. Each has a simple hold-the-pose task and a hand-written controller that serves as the teacher.</p>
+  <div class="tablewrap"><table>
+    <tr><th>Robot</th><th>Class</th><th>Actuators</th><th>Task</th><th>Teacher</th></tr>
+    <tr><td>Unitree G1</td><td>Humanoid</td><td class="num">29 joints</td><td>Stand for 10 s</td><td class="ok">Succeeds</td></tr>
+    <tr><td>Universal Robots UR5e</td><td>Industrial arm</td><td class="num">6 joints</td><td>Return to home pose within 3 s</td><td class="ok">Succeeds</td></tr>
+    <tr><td>Skydio X2</td><td>Drone</td><td class="num">4 rotors</td><td>Hover in place for 10 s</td><td class="ok">Succeeds</td></tr>
+    <tr><td>Unitree Go2</td><td>Quadruped</td><td class="num">12 joints</td><td>Stand for 10 s</td><td class="ok">Succeeds</td></tr>
+  </table></div>
+</div></section>
+
+<section id="results"><div class="wrap">
+  <h2>Results so far: the learned policies fail</h2>
+  <p class="sub">Two seeds, 20 demonstrations per robot, 2,000 training steps on the humanoid per model, 10 evaluation episodes per seed. All in simulation on 4 CPU cores.</p>
+  <div class="tablewrap"><table>
+    <tr><th>Robot</th><th>Policy</th><th>Task success</th><th>Mean steps (limit)</th></tr>
+    <tr><td>G1 humanoid</td><td>Scripted teacher</td><td class="ok">100%</td><td class="num">500 (500)</td></tr>
+    <tr><td>G1 humanoid</td><td>No commands</td><td class="no">0%</td><td class="num">94.3 (500)</td></tr>
+    <tr><td>G1 humanoid</td><td>Humanoid-only specialist</td><td class="no">0%</td><td class="num">89.4 (500)</td></tr>
+    <tr><td>G1 humanoid</td><td>Shared model</td><td class="no">0%</td><td class="num">86.2 (500)</td></tr>
+    <tr><td>UR5e arm</td><td>Shared model</td><td class="no">0%</td><td class="num">150 (150)</td></tr>
+    <tr><td>X2 drone</td><td>Shared model</td><td class="no">0%</td><td class="num">92.1 (500)</td></tr>
+    <tr><td>Go2 quadruped</td><td>Shared model</td><td class="no">0%</td><td class="num">54.0 (500)</td></tr>
+  </table></div>
+  <p class="note">On the humanoid, both learned policies fall about as fast as sending no commands. The cause is not yet diagnosed. Because both score zero, this run says nothing about whether sharing a model across robots helps.</p>
+
+  <h2 style="margin-top:56px">An earlier, easier test</h2>
+  <p class="sub">On a toy 17-joint humanoid with a weak teacher, the shared model was not worse than the specialist. Mean control steps before falling, one seed, 20 episodes.</p>
+  <div class="bars">
+    <div class="bar"><span>No commands</span><div class="track"><div class="fill" style="width:53.6%"></div></div><span class="v">40.2</span></div>
+    <div class="bar"><span>Humanoid-only specialist</span><div class="track"><div class="fill" style="width:68.7%"></div></div><span class="v">51.5</span></div>
+    <div class="bar"><span>Shared model</span><div class="track"><div class="fill a" style="width:78.3%"></div></div><span class="v">58.7</span></div>
+    <div class="bar"><span>Scripted teacher</span><div class="track"><div class="fill" style="width:100%"></div></div><span class="v">75.0</span></div>
+  </div>
+  <p class="note">The ranges overlap heavily (specialist 26 to 76, shared 45 to 94), so this does not establish that the shared model is better. Every policy here falls in under two seconds.</p>
+</div></section>
+
+<section><div class="wrap">
+  <h2>What comes next</h2>
+  <ol class="steps">
+    <li>Find out why the learned policies fail: check whether the model reproduces the teacher's actions on recorded data, then test more training, a larger model and recovery-rich demonstrations.</li>
+    <li>Replace the scripted teachers with controllers trained by reinforcement learning, so tasks can include walking and reaching.</li>
+    <li>Add a camera and a language instruction through a pretrained vision-language-action model.</li>
+    <li>Rerun the specialist-versus-shared comparison across more seeds once any policy succeeds.</li>
+    <li>Only then move to hardware, starting with a low-cost arm.</li>
+  </ol>
+</div></section>
+
+<section id="run"><div class="wrap">
+  <h2>Run it yourself</h2>
+  <p class="sub">Python 3.10 or newer. No GPU or robot needed.</p>
+<pre>git clone https://github.com/LightLLM/tinynav-arm
+cd tinynav-arm
+pip install -e '.[dev,ueb]'
+git clone --depth 1 https://github.com/google-deepmind/mujoco_menagerie third_party/mujoco_menagerie
+
+pytest -q                      # 19 tests
+python tools/ueb_fleet.py      # four robots, about 45 minutes on 4 CPU cores</pre>
+</div></section>
+</main>
+
+<footer><div class="wrap">
+  Research prototype. Simulation only. Not safety-certified and not for use on machinery near people. Robot models are from MuJoCo Menagerie and keep their own licences.
+</div></footer>
+</body>
+</html>
