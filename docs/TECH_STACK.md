@@ -39,6 +39,30 @@ python tools/ueb_humanoid.py            # full run, about 15 minutes on 4 CPU co
 pytest -q                               # includes tests/test_ueb.py
 ```
 
+## Measured result
+
+One run on 4 CPU cores (seed 0, 60 teacher demonstrations per body, 2,000 gradient steps on the
+humanoid for each model, 20 evaluation episodes capped at 300 steps). Full numbers are in
+`results/ueb_humanoid.json`.
+
+| Policy on the humanoid | Mean steps before falling |
+| --- | --- |
+| No motor commands | 40.2 |
+| Scripted teacher | 75.0 |
+| Humanoid-only specialist | 51.5 |
+| Shared brain (humanoid + walker + ant) | 58.7 |
+| Shared brain with the reflex layer | 49.8 |
+
+The shared brain did not do worse than the specialist on the humanoid, which is the direction H1
+predicts, but this is one seed and 20 episodes, so the gap is not established. Both learned
+policies fall short of the teacher. The same shared weights also ran the walker (184.1 steps
+against the teacher's 295.1) and the ant (300 of 300).
+
+The reflex layer changed every command and shortened the episode. The simulator's reset pose puts
+at least one joint just outside its stated range, so the layer blocks commands that push it
+further. That is the layer doing what it was written to do, and it shows the limits need tuning to
+the body before it is useful.
+
 ## Limits of this prototype
 
 - **The teacher is weak.** A PD controller holding the reset pose keeps the humanoid up for well
