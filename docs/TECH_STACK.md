@@ -85,6 +85,28 @@ python tools/ueb_fleet.py               # or set UEB_MENAGERIE to an existing ch
 
 Each model keeps its own licence inside its Menagerie folder; read it before redistributing.
 
+### Measured result on the real robot models: the learned policies fail
+
+Two seeds, 20 demonstrations per body, 2,000 gradient steps on the G1 per model, 10 evaluation
+episodes per seed (`results/ueb_fleet.json`). Every teacher completes its task; no learned policy
+does.
+
+| Body | Policy | Task success | Mean steps (limit) |
+| --- | --- | --- | --- |
+| G1 | No commands | 0% | 94.3 (500) |
+| G1 | Scripted teacher | 100% | 500 (500) |
+| G1 | Humanoid-only specialist | 0% | 89.4 (500) |
+| G1 | Shared brain | 0% | 86.2 (500) |
+| UR5e | Shared brain | 0% | 150 (150), never reaches home |
+| X2 | Shared brain | 0% | 92.1 (500) |
+| Go2 | Shared brain | 0% | 54.0 (500) |
+
+On the G1 both learned policies fall about as fast as sending no commands at all, so they have not
+learned to stand. The cause has not been diagnosed. Candidates to test, none confirmed: too little
+training for a 0.9M-parameter model; sampling noise from the flow head swamping the small, precise
+corrections these tasks need; and demonstrations that stay so close to the reference pose that
+they contain few recoveries to learn from.
+
 ## Limits of this prototype
 
 - **The teacher is weak.** A PD controller holding the reset pose keeps the humanoid up for well
