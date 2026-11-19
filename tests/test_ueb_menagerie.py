@@ -29,10 +29,10 @@ def test_teacher_completes_the_task(body):
 
 def test_g1_falls_without_control_and_reports_failure():
     env = MenagerieEnv("g1")
-    obs = env.reset(seed=0)
+    env.reset(seed=0)
     failed = False
     for _ in range(env.info.episode_steps):
-        obs, failed = env.step(np.zeros(29, dtype=np.float32))
+        _, failed = env.step(np.zeros(29, dtype=np.float32))
         if failed:
             break
     assert failed and not env.success()
