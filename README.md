@@ -91,6 +91,12 @@ Arm64 cloud runner. Record the exact device, CPU, OS, model checksum, ONNX
 Runtime version, thread configuration, warmup count, run count, model size,
 latency percentiles, memory, throughput, and accuracy delta.
 
+## Cloud deployment
+
+The repository deploys to Vercel as one project: `tinynav.api:app` runs as the API (set in
+`pyproject.toml` under `[tool.vercel]`) and `public/` is served as the website, which calls the
+API for its live demo. Training code in `ueb/` is not part of the deployment.
+
 ## Unified Embodied Brain prototype (humanoid first)
 
 `ueb/` is a research prototype of one policy that controls different robot bodies with the same
